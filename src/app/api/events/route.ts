@@ -108,6 +108,12 @@ export async function POST(request: Request) {
     );
     if (holesError) throw new Error(holesError.message);
 
+    // A single multi-row INSERT ... VALUES ... RETURNING preserves input
+    // order in Postgres, so playerIds[i] below still lines up with
+    // body.players[i] (and therefore with the groups' playerIndexes)
+    // without needing an explicit ORDER BY — which would fail here anyway,
+    // since ordering by a column outside the .select() projection isn't
+    // valid on an insert/returning query.
     const { data: insertedPlayers, error: playersError } = await admin
       .from("players")
       .insert(
@@ -117,13 +123,14 @@ export async function POST(request: Request) {
           playing_handicap: p.playingHandicap,
         }))
       )
-      .select("id")
-      .order("created_at", { ascending: true });
+      .select("id");
     if (playersError) throw new Error(playersError.message);
 
     const playerIds = (insertedPlayers ?? []).map((p) => p.id as string);
 
     if (body.groups?.length) {
+      // Same input-order guarantee as the players insert above — no
+      // ORDER BY needed (and, as above, one isn't valid here anyway).
       const { data: insertedGroups, error: groupsError } = await admin
         .from("groups")
         .insert(
@@ -134,8 +141,7 @@ export async function POST(request: Request) {
             sort_order: i,
           }))
         )
-        .select("id")
-        .order("sort_order", { ascending: true });
+        .select("id");
       if (groupsError) throw new Error(groupsError.message);
 
       const groupIds = (insertedGroups ?? []).map((g) => g.id as string);
