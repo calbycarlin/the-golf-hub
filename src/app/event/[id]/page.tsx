@@ -127,7 +127,7 @@ function HostControls({
               type="date"
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
-              className="min-w-0"
+              className="min-w-0 max-w-full appearance-none"
             />
           </div>
           <div className="flex gap-2">
