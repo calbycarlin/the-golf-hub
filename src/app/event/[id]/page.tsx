@@ -120,9 +120,15 @@ function HostControls({
             <Label htmlFor="hcourse">Course Name</Label>
             <Input id="hcourse" value={courseName} onChange={(e) => setCourseName(e.target.value)} />
           </div>
-          <div>
+          <div className="min-w-0">
             <Label htmlFor="hdate">Date</Label>
-            <Input id="hdate" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            <Input
+              id="hdate"
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              className="min-w-0"
+            />
           </div>
           <div className="flex gap-2">
             <Button onClick={saveDetails} disabled={saving} variant="accent">

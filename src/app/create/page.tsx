@@ -150,9 +150,15 @@ export default function CreateEventPage() {
                 <Label htmlFor="course">Course Name</Label>
                 <Input id="course" value={courseName} onChange={(e) => setCourseName(e.target.value)} placeholder="Royal Sands GC" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <Label htmlFor="date">Date (optional)</Label>
-                <Input id="date" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+                <Input
+                  id="date"
+                  type="date"
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  className="min-w-0"
+                />
               </div>
             </div>
           </Card>
@@ -179,7 +185,7 @@ export default function CreateEventPage() {
               Defaults to Par 4 with stroke index = hole number. Edit any hole — stroke index is used to fairly allocate handicap strokes.
             </p>
 
-            <div className="mt-4 grid grid-cols-[auto_1fr_1fr] items-center gap-x-3 gap-y-2 text-sm">
+            <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-sm">
               <div className="font-semibold text-navy/50">Hole</div>
               <div className="font-semibold text-navy/50">Par</div>
               <div className="font-semibold text-navy/50">Stroke Index</div>
@@ -227,6 +233,7 @@ function HoleRow({ hole, onChange }: { hole: HoleDraft; onChange: (patch: Partia
         max={6}
         value={hole.par}
         onChange={(par) => onChange({ par })}
+        className="w-full min-w-0"
         ariaLabel={`Par for hole ${hole.holeNumber}`}
       />
       <NumberField
@@ -234,6 +241,7 @@ function HoleRow({ hole, onChange }: { hole: HoleDraft; onChange: (patch: Partia
         max={18}
         value={hole.strokeIndex}
         onChange={(strokeIndex) => onChange({ strokeIndex })}
+        className="w-full min-w-0"
         ariaLabel={`Stroke index for hole ${hole.holeNumber}`}
       />
     </>
