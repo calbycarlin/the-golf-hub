@@ -10,9 +10,8 @@ import { NumberField } from "@/components/ui/NumberField";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { storeHostToken, hostLink as buildHostLink } from "@/lib/hostToken";
 import { CopyButton } from "@/components/CopyButton";
-import { PlayersEditor } from "@/components/PlayersEditor";
-import { GroupingsEditor, type GroupingsState } from "@/components/GroupingsEditor";
-import type { PlayerDraft } from "@/lib/draftTypes";
+import { GroupBuilder } from "@/components/GroupBuilder";
+import type { GroupBuilderState } from "@/lib/draftTypes";
 
 interface HoleDraft {
   holeNumber: number;
@@ -35,15 +34,9 @@ export default function CreateEventPage() {
   const [holeCount, setHoleCount] = useState<9 | 18>(18);
   const [holes, setHoles] = useState<HoleDraft[]>(() => defaultHoles(18));
 
-  const [players, setPlayers] = useState<PlayerDraft[]>([
-    { name: "", handicap: 0 },
-    { name: "", handicap: 0 },
-  ]);
-
-  const [groupingsState, setGroupingsState] = useState<GroupingsState>({
+  const [groupBuilderState, setGroupBuilderState] = useState<GroupBuilderState>({
     groups: [{ name: "Group 1", teeTime: "" }],
-    assignments: [0, 0],
-    playerA: [0],
+    players: [],
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -59,22 +52,12 @@ export default function CreateEventPage() {
     setHoles((hs) => hs.map((h, i) => (i === index ? { ...h, ...patch } : h)));
   }
 
-  function handlePlayersChange(next: PlayerDraft[]) {
-    setPlayers(next);
-    setGroupingsState((gs) => ({
-      ...gs,
-      assignments:
-        next.length > gs.assignments.length
-          ? [...gs.assignments, ...Array(next.length - gs.assignments.length).fill(0)]
-          : gs.assignments.slice(0, next.length),
-    }));
-  }
-
   async function handleSubmit() {
     setError(null);
 
     const trimmedName = name.trim();
     const trimmedCourse = courseName.trim();
+    const { groups, players } = groupBuilderState;
     const validPlayers = players.filter((p) => p.name.trim());
 
     if (!trimmedName || !trimmedCourse) {
@@ -85,13 +68,9 @@ export default function CreateEventPage() {
       setError("Add at least one player.");
       return;
     }
-
-    const { groups, assignments, playerA } = groupingsState;
-    const playersByGroup: number[][] = groups.map((_, gi) =>
-      assignments.flatMap((g, pi) => (g === gi ? [pi] : []))
-    );
     for (let gi = 0; gi < groups.length; gi++) {
-      if (playersByGroup[gi].length > 0 && !playersByGroup[gi].includes(playerA[gi])) {
+      const inGroup = validPlayers.filter((p) => p.groupIndex === gi);
+      if (inGroup.length > 0 && !inGroup.some((p) => p.isPlayerA)) {
         setError(`Group "${groups[gi].name}" needs a Player A selected.`);
         return;
       }
@@ -104,15 +83,17 @@ export default function CreateEventPage() {
         courseName: trimmedCourse,
         eventDate: eventDate || null,
         holes: holes.map((h) => ({ holeNumber: h.holeNumber, par: h.par, strokeIndex: h.strokeIndex })),
-        players: players
-          .map((p) => ({ name: p.name.trim(), playingHandicap: p.handicap }))
-          .filter((p) => p.name),
-        groups: groups.map((g, gi) => ({
-          name: g.name.trim() || `Group ${gi + 1}`,
-          teeTime: g.teeTime || null,
-          playerIndexes: playersByGroup[gi] ?? [],
-          playerAIndex: playerA[gi],
-        })),
+        players: validPlayers.map((p) => ({ name: p.name.trim(), playingHandicap: p.handicap })),
+        groups: groups.map((g, gi) => {
+          const playerIndexes = validPlayers.flatMap((p, pi) => (p.groupIndex === gi ? [pi] : []));
+          const playerAIndex = validPlayers.findIndex((p, pi) => playerIndexes.includes(pi) && p.isPlayerA);
+          return {
+            name: g.name.trim() || `Group ${gi + 1}`,
+            teeTime: g.teeTime || null,
+            playerIndexes,
+            playerAIndex,
+          };
+        }),
       };
 
       const data = await apiClient.post("/api/events", payload);
@@ -196,18 +177,12 @@ export default function CreateEventPage() {
           </Card>
 
           <Card>
-            <h2 className="text-lg font-bold text-navy">Players</h2>
-            <p className="mt-1 text-xs text-navy/50">Name and playing handicap (whole strokes for the round).</p>
+            <h2 className="text-lg font-bold text-navy">Groups &amp; Players</h2>
+            <p className="mt-1 text-xs text-navy/50">
+              Set the number of groups, then add each player straight into their group with a name, handicap, and Player A.
+            </p>
             <div className="mt-4">
-              <PlayersEditor players={players} onChange={handlePlayersChange} />
-            </div>
-          </Card>
-
-          <Card>
-            <h2 className="text-lg font-bold text-navy">Groupings</h2>
-            <p className="mt-1 text-xs text-navy/50">Split players into groups and mark one Player A per group.</p>
-            <div className="mt-4">
-              <GroupingsEditor players={players} state={groupingsState} onChange={setGroupingsState} />
+              <GroupBuilder state={groupBuilderState} onChange={setGroupBuilderState} />
             </div>
           </Card>
 

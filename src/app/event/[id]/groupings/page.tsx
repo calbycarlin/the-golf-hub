@@ -7,9 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { useEvent } from "@/lib/eventContext";
 import { createPublicClient } from "@/lib/supabase/client";
 import { apiClient, ApiError } from "@/lib/apiClient";
-import { PlayersEditor } from "@/components/PlayersEditor";
-import { GroupingsEditor, type GroupingsState } from "@/components/GroupingsEditor";
-import type { PlayerDraft, GroupDraft } from "@/lib/draftTypes";
+import { GroupBuilder } from "@/components/GroupBuilder";
+import type { GroupBuilderState, GroupDraft } from "@/lib/draftTypes";
 import type { GroupPlayerRow, GroupRow, PlayerRow } from "@/lib/supabase/types";
 
 interface ViewGroup extends GroupRow {
@@ -24,8 +23,7 @@ export default function GroupingsPage() {
   const [loading, setLoading] = useState(true);
 
   const [editing, setEditing] = useState(false);
-  const [playersDraft, setPlayersDraft] = useState<PlayerDraft[]>([]);
-  const [groupingsState, setGroupingsState] = useState<GroupingsState>({ groups: [], assignments: [], playerA: [] });
+  const [builderState, setBuilderState] = useState<GroupBuilderState>({ groups: [], players: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,58 +65,35 @@ export default function GroupingsPage() {
   }, [eventId, load]);
 
   function startEditing() {
-    const nextPlayersDraft: PlayerDraft[] = players.map((p) => ({
-      id: p.id,
-      name: p.name,
-      handicap: p.playing_handicap,
-    }));
-    const nextGroupsDraft: GroupDraft[] = groups.map((g) => ({
-      id: g.id,
-      name: g.name,
-      teeTime: g.tee_time ?? "",
-    }));
-    const assignments = nextPlayersDraft.map((p) => {
+    const groupsDraft: GroupDraft[] = groups.map((g) => ({ id: g.id, name: g.name, teeTime: g.tee_time ?? "" }));
+    const playersDraft = players.map((p) => {
       const gp = groupPlayers.find((x) => x.player_id === p.id);
-      if (!gp) return -1;
-      return groups.findIndex((g) => g.id === gp.group_id);
-    });
-    const playerA = nextGroupsDraft.map((g) => {
-      const gp = groupPlayers.find((x) => x.group_id === g.id && x.is_player_a);
-      if (!gp) return -1;
-      return nextPlayersDraft.findIndex((p) => p.id === gp.player_id);
+      return {
+        id: p.id,
+        name: p.name,
+        handicap: p.playing_handicap,
+        groupIndex: gp ? groups.findIndex((g) => g.id === gp.group_id) : -1,
+        isPlayerA: gp?.is_player_a ?? false,
+      };
     });
 
-    setPlayersDraft(nextPlayersDraft);
-    setGroupingsState({ groups: nextGroupsDraft, assignments, playerA });
+    setBuilderState({ groups: groupsDraft, players: playersDraft });
     setError(null);
     setEditing(true);
-  }
-
-  function handlePlayersChange(next: PlayerDraft[]) {
-    setPlayersDraft(next);
-    setGroupingsState((gs) => ({
-      ...gs,
-      assignments:
-        next.length > gs.assignments.length
-          ? [...gs.assignments, ...Array(next.length - gs.assignments.length).fill(-1)]
-          : gs.assignments.slice(0, next.length),
-    }));
   }
 
   async function save() {
     if (!hostToken) return;
     setError(null);
 
+    const { groups: groupsDraft, players: playersDraft } = builderState;
     if (playersDraft.some((p) => !p.name.trim())) {
       setError("Every player needs a name.");
       return;
     }
-    const { groups: groupsDraft, assignments, playerA } = groupingsState;
-    const playersByGroup: number[][] = groupsDraft.map((_, gi) =>
-      assignments.flatMap((g, pi) => (g === gi ? [pi] : []))
-    );
     for (let gi = 0; gi < groupsDraft.length; gi++) {
-      if (playersByGroup[gi].length > 0 && !playersByGroup[gi].includes(playerA[gi])) {
+      const inGroup = playersDraft.filter((p) => p.groupIndex === gi);
+      if (inGroup.length > 0 && !inGroup.some((p) => p.isPlayerA)) {
         setError(`Group "${groupsDraft[gi].name}" needs a Player A selected.`);
         return;
       }
@@ -139,10 +114,10 @@ export default function GroupingsPage() {
             id: g.id,
             name: g.name,
             teeTime: g.teeTime || null,
-            players: playersByGroup[gi].map((pi) => ({
-              playerId: savedPlayers[pi].id,
-              isPlayerA: pi === playerA[gi],
-            })),
+            players: playersDraft
+              .map((p, pi) => ({ ...p, savedId: savedPlayers[pi].id }))
+              .filter((p) => p.groupIndex === gi)
+              .map((p) => ({ playerId: p.savedId, isPlayerA: p.isPlayerA })),
           })),
         },
         hostToken
@@ -184,15 +159,12 @@ export default function GroupingsPage() {
       ) : editing ? (
         <div className="mt-4 flex flex-col gap-6">
           <Card>
-            <h2 className="text-lg font-bold text-navy">Players</h2>
+            <h2 className="text-lg font-bold text-navy">Groups &amp; Players</h2>
+            <p className="mt-1 text-xs text-navy/50">
+              Add, remove, or move players between groups. Mark one Player A per group.
+            </p>
             <div className="mt-4">
-              <PlayersEditor players={playersDraft} onChange={handlePlayersChange} />
-            </div>
-          </Card>
-          <Card>
-            <h2 className="text-lg font-bold text-navy">Groups</h2>
-            <div className="mt-4">
-              <GroupingsEditor players={playersDraft} state={groupingsState} onChange={setGroupingsState} />
+              <GroupBuilder state={builderState} onChange={setBuilderState} />
             </div>
           </Card>
           {error && <p className="text-sm font-medium text-red-600">{error}</p>}
