@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { NumberField } from "@/components/ui/NumberField";
 import type { PlayerDraft } from "@/lib/draftTypes";
 
 export function PlayersEditor({
@@ -30,14 +31,15 @@ export function PlayersEditor({
               value={p.name}
               onChange={(e) => updatePlayer(i, { name: e.target.value })}
               placeholder={`Player ${i + 1} name`}
-              className="flex-1"
+              className="min-w-0 flex-[3]"
             />
-            <Input
-              type="number"
+            <NumberField
               value={p.handicap}
-              onChange={(e) => updatePlayer(i, { handicap: Number(e.target.value) })}
-              className="w-20 text-center"
-              aria-label="Playing handicap"
+              onChange={(handicap) => updatePlayer(i, { handicap })}
+              min={0}
+              max={54}
+              className="h-[46px] w-16 flex-1 text-base"
+              ariaLabel="Playing handicap"
             />
             <button
               type="button"

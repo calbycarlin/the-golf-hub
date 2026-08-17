@@ -17,7 +17,7 @@ export default function HomePage() {
           <LinkButton href="/join" variant="accent" size="lg" className="w-full">
             Join an Event
           </LinkButton>
-          <LinkButton href="/create" variant="outline" size="lg" className="w-full !border-white !text-white hover:!bg-white/10">
+          <LinkButton href="/create" variant="outline" size="lg" className="w-full !border-white !bg-transparent !text-white hover:!bg-white/10">
             Create an Event
           </LinkButton>
         </div>

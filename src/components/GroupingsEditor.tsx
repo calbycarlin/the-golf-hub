@@ -1,5 +1,6 @@
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { NumberField } from "@/components/ui/NumberField";
 import type { GroupDraft, PlayerDraft } from "@/lib/draftTypes";
 
 export interface GroupingsState {
@@ -58,13 +59,13 @@ export function GroupingsEditor({
     <div>
       <div className="flex flex-wrap items-center gap-3">
         <Label className="mb-0">Number of groups</Label>
-        <Input
-          type="number"
+        <NumberField
           min={1}
           max={Math.max(1, players.length)}
           value={groups.length}
-          onChange={(e) => setNumGroups(Number(e.target.value))}
-          className="w-20 text-center"
+          onChange={setNumGroups}
+          className="w-16 text-base"
+          ariaLabel="Number of groups"
         />
         <Button type="button" variant="outline" size="md" onClick={autoSplit}>
           Auto-split evenly

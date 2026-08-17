@@ -6,6 +6,7 @@ import { Container } from "@/components/ui/Container";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { Button, LinkButton } from "@/components/ui/Button";
+import { NumberField } from "@/components/ui/NumberField";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { storeHostToken, hostLink as buildHostLink } from "@/lib/hostToken";
 import { CopyButton } from "@/components/CopyButton";
@@ -221,21 +222,19 @@ function HoleRow({ hole, onChange }: { hole: HoleDraft; onChange: (patch: Partia
   return (
     <>
       <div className="flex h-10 items-center font-semibold text-navy">{hole.holeNumber}</div>
-      <input
-        type="number"
+      <NumberField
         min={3}
         max={6}
         value={hole.par}
-        onChange={(e) => onChange({ par: Number(e.target.value) })}
-        className="h-10 rounded-lg border border-navy/15 bg-white px-2 text-center"
+        onChange={(par) => onChange({ par })}
+        ariaLabel={`Par for hole ${hole.holeNumber}`}
       />
-      <input
-        type="number"
+      <NumberField
         min={1}
         max={18}
         value={hole.strokeIndex}
-        onChange={(e) => onChange({ strokeIndex: Number(e.target.value) })}
-        className="h-10 rounded-lg border border-navy/15 bg-white px-2 text-center"
+        onChange={(strokeIndex) => onChange({ strokeIndex })}
+        ariaLabel={`Stroke index for hole ${hole.holeNumber}`}
       />
     </>
   );
