@@ -1,12 +1,12 @@
 import { LinkButton } from "@/components/ui/Button";
-import { FlagIcon, TrophyIcon } from "@/components/ui/icons";
+import { LogoMark, TrophyIcon } from "@/components/ui/icons";
 
 export default function HomePage() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center bg-navy px-4 py-16 text-white">
       <div className="w-full max-w-sm text-center">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent text-navy">
-          <FlagIcon className="h-9 w-9" />
+        <div className="mx-auto mb-6 flex h-16 w-20 items-center justify-center rounded-2xl bg-accent text-navy">
+          <LogoMark className="h-11 w-auto" />
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight">The Golf Hub</h1>
         <p className="mt-3 text-balance text-white/70">
