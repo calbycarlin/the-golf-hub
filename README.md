@@ -1,0 +1,130 @@
+# The Golf Hub
+
+A hub for a golf society or group of friends to run a golf day together: set up players and groups, enter scores from the course on a phone, watch a live Stableford leaderboard, and see final results once the round is done.
+
+No accounts, no passwords. Access is via a short **Join Code** (view + score entry) and a per-event **Host Token** (setup/admin), as described below.
+
+## Tech stack
+
+- **Next.js 16** (App Router, TypeScript) — frontend + API routes (Route Handlers)
+- **Tailwind CSS v4** — styling (utility-first, CSS-based theme tokens, no separate `tailwind.config.js`)
+- **Supabase** — Postgres (data), Row Level Security, Realtime (live leaderboard/gallery updates), Storage (photo gallery)
+- **Vitest** — unit tests for the Stableford scoring engine
+- **Vercel** — deployment target
+
+I stuck with the recommended stack as-is (Supabase + Vercel) rather than the SQLite/polling-only fallback, since a hosted Postgres + Realtime + Storage backend is the better fit for a multi-device, concurrent-write app like this and Supabase's free tier is enough for a golf day. The live leaderboard and gallery use a **Supabase Realtime subscription as the primary update mechanism, with a 5–10s poll as a fallback/belt-and-braces** for the leaderboard — so it keeps working even if a realtime connection drops on a patchy course network.
+
+## How access control works (no accounts)
+
+There's no Supabase Auth / user login anywhere in this app. Instead:
+
+- **Join Code** — 6 characters, uppercase, digits `2-9` and letters with `0/O/1/I` removed to avoid ambiguity. Looked up client-side against the public `events` table to find the event ID; from there, every event page (groupings, scorecards, leaderboard, results, gallery) is reachable and readable by anyone with the link.
+- **Host Token** — a 32-byte random secret generated server-side when the event is created, shown once, and stored in the creating device's `localStorage` (keyed by event ID). A **Host Link** (`/event/{id}?host={token}`) is also shown as a backup — opening it stores the token again, so it can be bookmarked or sent to yourself. Every write that changes event/course/player/groupings data goes through an API route that hashes the supplied token (SHA-256 + a server-side pepper) and compares it to the hash stored on the event — the raw token is never stored server-side.
+- **Player A confirmation** — honour-system, no password. The score-entry page for a group just asks "Are you entering scores as {Player A's name}?" before unlocking the grid, and remembers the answer in that browser's `localStorage` (with a "Not you?" reset link). This is intentionally lightweight per the spec; a natural v2 upgrade is a per-group 4-digit PIN if honour-system access turns out not to be enough.
+
+**Database-level enforcement.** Row Level Security is on for every table. The anon (public) key can only `SELECT` — that's what powers the public leaderboard/gallery pages and Realtime subscriptions. All `INSERT`/`UPDATE`/`DELETE` for events/holes/players/groups/groupings goes through Next.js Route Handlers using the Supabase **service role** key, which checks the host token before writing — so even if a page had a bug, the database itself won't accept a write from a browser that only holds the anon key for those tables. The two exceptions, both deliberate and matching the product spec: `hole_scores` (INSERT/UPDATE) and `photos` (INSERT) are open to the anon key, because score entry is honour-system by design and photo upload has no restriction at all. See `supabase/migrations/0001_init.sql` for the exact policies and the reasoning inline.
+
+## Scoring
+
+All Stableford math lives in one place — [`src/lib/scoring.ts`](src/lib/scoring.ts) — and both the live leaderboard and the final results page call the same `calculateStableford()` function, so they can't disagree. It implements exactly the spec:
+
+```
+baseStrokes = floor(playing_handicap / 18)
+extraStrokes = playing_handicap % 18
+strokesReceived(hole) = baseStrokes + (hole.stroke_index <= extraStrokes ? 1 : 0)
+netPar = hole.par + strokesReceived
+points = max(0, 2 - (grossStrokes - netPar))
+```
+
+Holes with no score entered yet are excluded from the total/thru count rather than treated as zero. Unit tests with hand-calculated examples (including a >18 handicap case) are in [`src/lib/scoring.test.ts`](src/lib/scoring.test.ts) — run with `npm test`.
+
+Ranking (used by both the leaderboard and results podium) is standard competition ranking — `1, 1, 3, 4…` — via [`src/lib/ranking.ts`](src/lib/ranking.ts), so ties show as e.g. "T-2". Per the spec, tied podium places are shown as a shared placing rather than an invented tiebreak; individual hole-by-hole scores stay in the database and are viewable by expanding a player's row on the Results page, in case a tie ever needs manual resolution.
+
+## Local development
+
+1. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+2. **Create a Supabase project** at [supabase.com](https://supabase.com) (free tier is fine).
+
+3. **Run the migrations.** In the Supabase dashboard's SQL Editor, run the contents of `supabase/migrations/0001_init.sql` then `supabase/migrations/0002_storage.sql`, in order. (If you use the Supabase CLI instead: `supabase link` then `supabase db push`.)
+
+4. **Copy the env file and fill it in:**
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+   | Variable | Where to find it |
+   | --- | --- |
+   | `NEXT_PUBLIC_SUPABASE_URL` | Project Settings → API → Project URL |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API → `anon` `public` key |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role` key — **server-only secret, never expose to the browser** |
+   | `HOST_TOKEN_PEPPER` | Any random string you generate (e.g. `openssl rand -hex 32`) — optional locally (a dev default is used), but set a real value in any deployed environment |
+
+5. **Run the dev server**
+
+   ```bash
+   npm run dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000).
+
+6. **Run tests / lint**
+
+   ```bash
+   npm test
+   npm run lint
+   ```
+
+## Deploying to Vercel
+
+1. Push this repo to GitHub.
+2. Import it into Vercel ([vercel.com/new](https://vercel.com/new)).
+3. Add the same four environment variables from `.env.example` in the Vercel project's Settings → Environment Variables (Production + Preview).
+4. Deploy. No other config needed — it's a standard Next.js App Router project.
+
+## Project structure
+
+```
+src/
+  app/
+    page.tsx                    Home
+    join/                       Join by code
+    create/                     Host setup wizard + confirmation screen
+    event/[id]/
+      layout.tsx                Shared header/nav + EventProvider (host/event state)
+      page.tsx                  Event Hub (+ host-only controls)
+      groupings/                Groupings (read-only + host edit)
+      scorecards/               Per-group links into score entry, with progress
+      score/[groupId]/          Score entry (Player A gate, hole-by-hole, autosave)
+      leaderboard/              Live Stableford leaderboard
+      results/                  Podium + full standings (gated on event.status)
+      gallery/                  Photo upload + grid
+    api/events/                 Route Handlers for all host-authorized writes
+  lib/
+    scoring.ts                  Stableford engine (+ scoring.test.ts)
+    ranking.ts                  Shared competition-ranking helper
+    codes.ts / joinCode.ts      Join code + host token generation/hashing
+    hostAuth.ts                 Server-side host token verification for API routes
+    eventContext.tsx            Client context: event data, host status, realtime
+    scoreQueue.ts                localStorage retry queue for score autosave
+    supabase/                   Public (anon) and admin (service role) clients
+supabase/migrations/            SQL schema + RLS policies + storage bucket
+```
+
+## Assumptions & simplifications
+
+A few calls I made where the spec left room, plus one design trade-off flagged in the spec itself:
+
+- **Player A is honour-system**, as the spec explicitly allows — no PIN. Noted above as the natural place to tighten later.
+- **Setup → In Progress transition**: the spec describes the host's "Mark Event Complete" control but not what starts the round. I made it automatic and unremarkable: the event flips from `setup` to `in_progress` the first time any score is saved for any group (a no-auth, idempotent endpoint), rather than requiring an explicit "Start Round" click from the host.
+- **Accent colour**: the spec offered a choice between muted gold and golf green — I went with **gold** (`#C9A54E`), used for primary CTAs, the "live" indicator, and podium highlights.
+- **No dark mode.** This app is meant to be used outdoors on a phone in bright sunlight, so it intentionally ignores `prefers-color-scheme` and uses one consistent, high-contrast navy/white/gold theme rather than switching palettes.
+- **9 or 18 holes**: the create-event wizard defaults to 18 with a toggle for 9, since golf societies commonly run 9-hole evenings too; the spec's "up to 18 holes" language allows for this.
+- **Groupings editor uses assign-by-dropdown, not drag-and-drop.** The spec allows either; a `<select>` per player is faster to build correctly and works at least as well one-thumb on a phone.
+- **Deleting a whole group** (not just editing its membership) does cascade-delete any scores already entered for it — editing a group in place (renaming, reassigning players) does not touch scores. This is called out inline in the groupings API route.
+- **RLS is coarse, not code-aware** (see "How access control works" above) — since there's no session, Postgres can't verify "this caller knows the join code." Reads are public at the database layer; the join code is what gates *reaching* the page in the first place. This is a deliberate trade-off consistent with the rest of the no-accounts design, not an oversight.
