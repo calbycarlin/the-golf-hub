@@ -9,9 +9,11 @@ const UNASSIGNED = -1;
  * Groups-first player entry: pick the number of groups, then add players
  * directly into each group's card (name + handicap + Player A), rather
  * than maintaining one long flat roster with a group-picker dropdown per
- * row. A player can still be moved to a different group via a small
- * inline selector, and removed groups don't delete their players — they
- * fall back to an "Unassigned" card so nothing is silently lost.
+ * row. There's no cross-group "move" control by design — reassigning a
+ * player means removing and re-adding them in the right group, which
+ * keeps each row down to just what it needs on a small screen. Removed
+ * groups don't delete their players — they fall back to an "Unassigned"
+ * card so nothing is silently lost.
  */
 export function GroupBuilder({
   state,
@@ -50,10 +52,6 @@ export function GroupBuilder({
 
   function removePlayer(playerIndex: number) {
     onChange({ ...state, players: players.filter((_, i) => i !== playerIndex) });
-  }
-
-  function movePlayer(playerIndex: number, groupIndex: number) {
-    updatePlayer(playerIndex, { groupIndex, isPlayerA: false });
   }
 
   function setPlayerA(playerIndex: number, groupIndex: number) {
@@ -104,12 +102,9 @@ export function GroupBuilder({
                     handicap={p.handicap}
                     isPlayerA={p.isPlayerA}
                     radioGroupName={`playerA-${gi}`}
-                    groups={groups}
-                    currentGroupIndex={gi}
                     onNameChange={(name) => updatePlayer(p.index, { name })}
                     onHandicapChange={(handicap) => updatePlayer(p.index, { handicap })}
                     onPlayerAChange={() => setPlayerA(p.index, gi)}
-                    onMove={(target) => movePlayer(p.index, target)}
                     onRemove={() => removePlayer(p.index)}
                   />
                 ))}
@@ -127,7 +122,7 @@ export function GroupBuilder({
       {unassigned.length > 0 && (
         <div className="mt-4 rounded-xl border border-dashed border-navy/20 p-3">
           <p className="font-semibold text-navy/60">Unassigned</p>
-          <p className="text-xs text-navy/40">Not currently in a group — move them into one below.</p>
+          <p className="text-xs text-navy/40">Not currently in a group — remove and re-add them under the right one.</p>
           <div className="mt-3 flex flex-col gap-2">
             {unassigned.map((p) => (
               <PlayerRow
@@ -135,11 +130,8 @@ export function GroupBuilder({
                 name={p.name}
                 handicap={p.handicap}
                 isPlayerA={false}
-                groups={groups}
-                currentGroupIndex={UNASSIGNED}
                 onNameChange={(name) => updatePlayer(p.index, { name })}
                 onHandicapChange={(handicap) => updatePlayer(p.index, { handicap })}
-                onMove={(target) => movePlayer(p.index, target)}
                 onRemove={() => removePlayer(p.index)}
               />
             ))}
@@ -155,24 +147,18 @@ function PlayerRow({
   handicap,
   isPlayerA,
   radioGroupName,
-  groups,
-  currentGroupIndex,
   onNameChange,
   onHandicapChange,
   onPlayerAChange,
-  onMove,
   onRemove,
 }: {
   name: string;
   handicap: number;
   isPlayerA: boolean;
   radioGroupName?: string;
-  groups: GroupDraft[];
-  currentGroupIndex: number;
   onNameChange: (name: string) => void;
   onHandicapChange: (handicap: number) => void;
   onPlayerAChange?: () => void;
-  onMove: (groupIndex: number) => void;
   onRemove: () => void;
 }) {
   return (
@@ -187,28 +173,15 @@ function PlayerRow({
           className="shrink-0"
         />
       )}
-      <Input value={name} onChange={(e) => onNameChange(e.target.value)} placeholder="Player name" className="min-w-0 flex-[3]" />
+      <Input value={name} onChange={(e) => onNameChange(e.target.value)} placeholder="Player name" className="min-w-0 flex-1" />
       <NumberField
         value={handicap}
         onChange={onHandicapChange}
         min={0}
         max={54}
-        className="h-[46px] w-16 flex-1 text-base"
+        className="h-[46px] w-14 shrink-0 text-base"
         ariaLabel="Playing handicap"
       />
-      <select
-        value={currentGroupIndex}
-        onChange={(e) => onMove(Number(e.target.value))}
-        className="shrink-0 rounded-lg border border-navy/15 bg-white px-2 py-2 text-xs"
-        aria-label="Move to group"
-      >
-        <option value={-1}>Unassigned</option>
-        {groups.map((g, gi) => (
-          <option key={gi} value={gi}>
-            {g.name || `Group ${gi + 1}`}
-          </option>
-        ))}
-      </select>
       <button type="button" onClick={onRemove} className="shrink-0 p-2 text-navy/40 hover:text-red-600" aria-label="Remove player">
         ✕
       </button>
