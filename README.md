@@ -26,7 +26,9 @@ There's no Supabase Auth / user login anywhere in this app. Instead:
 
 ## Scoring
 
-All Stableford math lives in one place — [`src/lib/scoring.ts`](src/lib/scoring.ts) — and both the live leaderboard and the final results page call the same `calculateStableford()` function, so they can't disagree. It implements exactly the spec:
+The host picks a scoring format per event, stored on `events.scoring_format`: **Stableford** (default) or **Stroke Play**. Both live in one place — [`src/lib/scoring.ts`](src/lib/scoring.ts) — and the live leaderboard and final results page both call the same functions, so they can't disagree.
+
+**Stableford** implements exactly the spec:
 
 ```
 baseStrokes = floor(playing_handicap / 18)
@@ -36,9 +38,11 @@ netPar = hole.par + strokesReceived
 points = max(0, 2 - (grossStrokes - netPar))
 ```
 
-Holes with no score entered yet are excluded from the total/thru count rather than treated as zero. Unit tests with hand-calculated examples (including a >18 handicap case) are in [`src/lib/scoring.test.ts`](src/lib/scoring.test.ts) — run with `npm test`.
+**Stroke Play** ranks by **net** total strokes (gross minus playing handicap; lowest wins) rather than gross — see the assumptions below for why. Net is computed per hole the same way Stableford allocates handicap strokes (`gross - strokesReceived`) and summed only over holes played so far, rather than deducting the player's *full* handicap from a partial gross total — that keeps an in-progress leaderboard fair instead of making net scores look artificially low before the round is finished. Once all holes are in, this necessarily equals the simpler `grossTotal - playingHandicap`, which `scoring.test.ts` checks directly.
 
-Ranking (used by both the leaderboard and results podium) is standard competition ranking — `1, 1, 3, 4…` — via [`src/lib/ranking.ts`](src/lib/ranking.ts), so ties show as e.g. "T-2". Per the spec, tied podium places are shown as a shared placing rather than an invented tiebreak; individual hole-by-hole scores stay in the database and are viewable by expanding a player's row on the Results page, in case a tie ever needs manual resolution.
+Holes with no score entered yet are excluded from the running total/thru count rather than treated as zero, for both formats. Unit tests with hand-calculated examples (including a >18 handicap case) are in [`src/lib/scoring.test.ts`](src/lib/scoring.test.ts) — run with `npm test`.
+
+Ranking (used by both the leaderboard and results podium) is standard competition ranking — `1, 1, 3, 4…` — via [`src/lib/ranking.ts`](src/lib/ranking.ts), so ties show as e.g. "T-2". It sorts descending for Stableford (more points is better) and ascending for Stroke Play (fewer strokes is better). Per the spec, tied podium places are shown as a shared placing rather than an invented tiebreak; individual hole-by-hole scores stay in the database and are viewable by expanding a player's row on the Results page, in case a tie ever needs manual resolution.
 
 ## Local development
 
@@ -50,7 +54,7 @@ Ranking (used by both the leaderboard and results podium) is standard competitio
 
 2. **Create a Supabase project** at [supabase.com](https://supabase.com) (free tier is fine).
 
-3. **Run the migrations.** In the Supabase dashboard's SQL Editor, run the contents of `supabase/migrations/0001_init.sql` then `supabase/migrations/0002_storage.sql`, in order. (If you use the Supabase CLI instead: `supabase link` then `supabase db push`.)
+3. **Run the migrations.** In the Supabase dashboard's SQL Editor, run each file in `supabase/migrations/` in order (`0001_init.sql`, `0002_storage.sql`, `0003_scoring_format.sql`). (If you use the Supabase CLI instead: `supabase link` then `supabase db push`.)
 
 4. **Copy the env file and fill it in:**
 
@@ -125,6 +129,7 @@ A few calls I made where the spec left room, plus one design trade-off flagged i
 - **Accent colour**: the spec offered a choice between muted gold and golf green — I went with **gold** (`#C9A54E`), used for primary CTAs, the "live" indicator, and podium highlights.
 - **No dark mode.** This app is meant to be used outdoors on a phone in bright sunlight, so it intentionally ignores `prefers-color-scheme` and uses one consistent, high-contrast navy/white/gold theme rather than switching palettes.
 - **9 or 18 holes**: the create-event wizard defaults to 18 with a toggle for 9, since golf societies commonly run 9-hole evenings too; the spec's "up to 18 holes" language allows for this.
-- **Groupings editor uses assign-by-dropdown, not drag-and-drop.** The spec allows either; a `<select>` per player is faster to build correctly and works at least as well one-thumb on a phone.
+- **Groupings are entered group-first**, not as one flat player roster with a group-picker dropdown per row: pick the number of groups, then add each player directly into their group (name, handicap, Player A). Moving someone between groups is remove-and-re-add rather than an inline "move" control — deliberately, to keep each row down to just what it needs on a phone-width screen.
 - **Deleting a whole group** (not just editing its membership) does cascade-delete any scores already entered for it — editing a group in place (renaming, reassigning players) does not touch scores. This is called out inline in the groupings API route.
 - **RLS is coarse, not code-aware** (see "How access control works" above) — since there's no session, Postgres can't verify "this caller knows the join code." Reads are public at the database layer; the join code is what gates *reaching* the page in the first place. This is a deliberate trade-off consistent with the rest of the no-accounts design, not an oversight.
+- **Stroke Play ranks by net, not gross.** The spec only asked for Stableford; Stroke Play was added later as a second host-selectable format. Since the app already collects a playing handicap for every player specifically for fair comparison, gross-only ranking would have been inconsistent with that — net (gross minus handicap) keeps both formats fair across mixed-handicap groups. The scoring format is fixed at event creation; there's no host control to change it mid-event.

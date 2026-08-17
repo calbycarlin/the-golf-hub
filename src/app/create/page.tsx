@@ -12,6 +12,12 @@ import { storeHostToken, hostLink as buildHostLink } from "@/lib/hostToken";
 import { CopyButton } from "@/components/CopyButton";
 import { GroupBuilder } from "@/components/GroupBuilder";
 import type { GroupBuilderState } from "@/lib/draftTypes";
+import type { ScoringFormat } from "@/lib/supabase/types";
+
+const SCORING_FORMAT_OPTIONS: { value: ScoringFormat; label: string; description: string }[] = [
+  { value: "stableford", label: "Stableford", description: "Points per hole based on net score. Higher total wins — one bad hole won't wreck the round." },
+  { value: "stroke_play", label: "Stroke Play", description: "Ranked by net total strokes (gross minus handicap). Lowest total wins." },
+];
 
 interface HoleDraft {
   holeNumber: number;
@@ -33,6 +39,7 @@ export default function CreateEventPage() {
   const [eventDate, setEventDate] = useState("");
   const [holeCount, setHoleCount] = useState<9 | 18>(18);
   const [holes, setHoles] = useState<HoleDraft[]>(() => defaultHoles(18));
+  const [scoringFormat, setScoringFormat] = useState<ScoringFormat>("stableford");
 
   const [groupBuilderState, setGroupBuilderState] = useState<GroupBuilderState>({
     groups: [{ name: "Group 1", teeTime: "" }],
@@ -82,6 +89,7 @@ export default function CreateEventPage() {
         name: trimmedName,
         courseName: trimmedCourse,
         eventDate: eventDate || null,
+        scoringFormat,
         holes: holes.map((h) => ({ holeNumber: h.holeNumber, par: h.par, strokeIndex: h.strokeIndex })),
         players: validPlayers.map((p) => ({ name: p.name.trim(), playingHandicap: p.handicap })),
         groups: groups.map((g, gi) => {
@@ -140,6 +148,24 @@ export default function CreateEventPage() {
                   onChange={(e) => setEventDate(e.target.value)}
                   className="min-w-0 max-w-full appearance-none"
                 />
+              </div>
+              <div>
+                <Label className="mb-2">Scoring Format</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {SCORING_FORMAT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setScoringFormat(opt.value)}
+                      className={`flex-1 rounded-xl border-2 p-3 text-left transition-colors ${
+                        scoringFormat === opt.value ? "border-navy bg-navy/5" : "border-navy/15 bg-white"
+                      }`}
+                    >
+                      <span className="block font-semibold text-navy">{opt.label}</span>
+                      <span className="mt-0.5 block text-xs text-navy/60">{opt.description}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </Card>

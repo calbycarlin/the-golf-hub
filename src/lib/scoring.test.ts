@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateStableford, holeStablefordPoints, strokesReceived } from "./scoring";
+import { calculateStableford, calculateStrokePlay, holeStablefordPoints, strokesReceived } from "./scoring";
 
 describe("strokesReceived", () => {
   it("gives a single stroke on holes at/under the extra-strokes count", () => {
@@ -76,5 +76,67 @@ describe("calculateStableford", () => {
 
     expect(summary.total).toBe(3);
     expect(summary.thru).toBe(2);
+  });
+});
+
+describe("calculateStrokePlay", () => {
+  const holes = [
+    { holeNumber: 1, par: 4, strokeIndex: 5 },
+    { holeNumber: 2, par: 4, strokeIndex: 15 },
+    { holeNumber: 3, par: 3, strokeIndex: 1 },
+  ];
+
+  it("only counts holes played so far, net computed per hole", () => {
+    const summary = calculateStrokePlay(9, holes, [
+      { holeNumber: 1, strokes: 5 }, // SI5 <= extra(9) -> 1 stroke received, net 4
+      { holeNumber: 2, strokes: null },
+    ]);
+
+    expect(summary.thru).toBe(1);
+    expect(summary.grossTotal).toBe(5);
+    expect(summary.netTotal).toBe(4);
+  });
+
+  it("sums gross and net correctly across a full set of holes", () => {
+    const summary = calculateStrokePlay(9, holes, [
+      { holeNumber: 1, strokes: 5 }, // SI5<=9 -> 1 stroke, net 4
+      { holeNumber: 2, strokes: 4 }, // SI15>9 -> 0 strokes, net 4
+      { holeNumber: 3, strokes: 3 }, // SI1<=9 -> 1 stroke, net 2
+    ]);
+
+    expect(summary.thru).toBe(3);
+    expect(summary.grossTotal).toBe(12);
+    expect(summary.netTotal).toBe(10);
+  });
+
+  it("handles a high handicap player correctly (>18)", () => {
+    const summary = calculateStrokePlay(20, holes, [
+      { holeNumber: 1, strokes: 6 }, // base1+extra2, SI5>2 -> 1 stroke, net 5
+      { holeNumber: 3, strokes: 5 }, // SI1<=2 -> 2 strokes, net 3
+    ]);
+
+    expect(summary.grossTotal).toBe(11);
+    expect(summary.netTotal).toBe(8);
+    expect(summary.thru).toBe(2);
+  });
+
+  it("matches the flat gross-minus-handicap total once all 18 holes are in", () => {
+    // A player's per-hole strokesReceived always sums to their handicap
+    // across a genuine 18-hole set (SI 1-18 each represented once) — this
+    // is what makes the per-hole net calculation safe to use mid-round.
+    const eighteenHoles = Array.from({ length: 18 }, (_, i) => ({
+      holeNumber: i + 1,
+      par: 4,
+      strokeIndex: i + 1,
+    }));
+    const playingHandicap = 9;
+    const scores = eighteenHoles.map((h) => ({ holeNumber: h.holeNumber, strokes: 4 }));
+
+    const summary = calculateStrokePlay(playingHandicap, eighteenHoles, scores);
+
+    expect(summary.thru).toBe(18);
+    expect(summary.grossTotal).toBe(72);
+    expect(summary.netTotal).toBe(summary.grossTotal - playingHandicap);
+    expect(summary.netTotal).toBe(63);
   });
 });

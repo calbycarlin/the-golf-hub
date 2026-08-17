@@ -1,4 +1,5 @@
 export type EventStatus = "setup" | "in_progress" | "complete";
+export type ScoringFormat = "stableford" | "stroke_play";
 
 export interface EventRow {
   id: string;
@@ -8,6 +9,7 @@ export interface EventRow {
   join_code: string;
   host_token_hash: string;
   status: EventStatus;
+  scoring_format: ScoringFormat;
   created_at: string;
 }
 

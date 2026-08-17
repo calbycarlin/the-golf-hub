@@ -2,21 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPublicClient } from "@/lib/supabase/client";
-import { calculateStableford, type StablefordSummary } from "@/lib/scoring";
-import { rankByPoints } from "@/lib/ranking";
-import type { GroupPlayerRow, GroupRow, HoleRow, HoleScoreRow, PlayerRow } from "@/lib/supabase/types";
+import { calculateStableford, calculateStrokePlay, type StablefordSummary, type StrokePlaySummary } from "@/lib/scoring";
+import { rankByValue } from "@/lib/ranking";
+import type { GroupPlayerRow, GroupRow, HoleRow, HoleScoreRow, PlayerRow, ScoringFormat } from "@/lib/supabase/types";
 
-export interface LeaderboardRow {
-  player: PlayerRow;
-  groupName: string | null;
-  summary: StablefordSummary;
-  rank: number;
-  tied: boolean;
-}
+export type LeaderboardRow =
+  | { format: "stableford"; player: PlayerRow; groupName: string | null; summary: StablefordSummary; rank: number; tied: boolean }
+  | { format: "stroke_play"; player: PlayerRow; groupName: string | null; summary: StrokePlaySummary; rank: number; tied: boolean };
 
 const POLL_MS = 8000;
 
-export function useLeaderboardData(eventId: string) {
+export function useLeaderboardData(eventId: string, scoringFormat: ScoringFormat) {
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [holeCount, setHoleCount] = useState(18);
   const [loading, setLoading] = useState(true);
@@ -52,18 +48,27 @@ export function useLeaderboardData(eventId: string) {
       const playerScores = scores
         .filter((s) => s.player_id === player.id)
         .map((s) => ({ holeNumber: s.hole_number, strokes: s.strokes }));
-      const summary = calculateStableford(player.playing_handicap, holeInfos, playerScores);
       const gp = groupPlayers.find((g) => g.player_id === player.id);
       const groupName = gp ? groups.find((g) => g.id === gp.group_id)?.name ?? null : null;
-      return { player, groupName, summary };
+
+      if (scoringFormat === "stroke_play") {
+        const summary = calculateStrokePlay(player.playing_handicap, holeInfos, playerScores);
+        return { format: "stroke_play" as const, player, groupName, summary };
+      }
+      const summary = calculateStableford(player.playing_handicap, holeInfos, playerScores);
+      return { format: "stableford" as const, player, groupName, summary };
     });
 
-    const ranked = rankByPoints(summaries, (s) => s.summary.total);
+    // Stableford: higher points win. Stroke Play: lower net strokes win.
+    const ranked =
+      scoringFormat === "stroke_play"
+        ? rankByValue(summaries, (s) => (s.summary as StrokePlaySummary).netTotal, "asc")
+        : rankByValue(summaries, (s) => (s.summary as StablefordSummary).total, "desc");
 
-    setRows(ranked.map((r) => ({ ...r.item, rank: r.rank, tied: r.tied })));
+    setRows(ranked.map((r) => ({ ...r.item, rank: r.rank, tied: r.tied })) as LeaderboardRow[]);
     setHoleCount(holes.length || 18);
     setLoading(false);
-  }, [eventId]);
+  }, [eventId, scoringFormat]);
 
   useEffect(() => {
     // Fetch-on-mount: setState happens after the awaits inside `load`.

@@ -7,14 +7,19 @@ import { useLeaderboardData } from "@/lib/useLeaderboardData";
 
 export default function LeaderboardPage() {
   const { eventId, event } = useEvent();
-  const { rows, holeCount, loading } = useLeaderboardData(eventId);
+  const scoringFormat = event?.scoring_format ?? "stableford";
+  const { rows, holeCount, loading } = useLeaderboardData(eventId, scoringFormat);
+  const isStrokePlay = scoringFormat === "stroke_play";
 
   return (
     <Container>
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-navy">Live Leaderboard</h1>
+        <div>
+          <h1 className="text-xl font-bold text-navy">Live Leaderboard</h1>
+          <p className="text-xs text-navy/50">{isStrokePlay ? "Stroke Play — lowest net strokes wins" : "Stableford — most points wins"}</p>
+        </div>
         {event?.status === "in_progress" && (
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-accent-hover">
+          <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-accent-hover">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent-hover" />
             Live
           </span>
@@ -48,7 +53,7 @@ export default function LeaderboardPage() {
                 <th className="px-3 py-2">Player</th>
                 <th className="hidden px-3 py-2 sm:table-cell">Group</th>
                 <th className="px-3 py-2 text-center">Thru</th>
-                <th className="px-3 py-2 text-right">Pts</th>
+                <th className="px-3 py-2 text-right">{isStrokePlay ? "Net" : "Pts"}</th>
               </tr>
             </thead>
             <tbody>
@@ -62,7 +67,9 @@ export default function LeaderboardPage() {
                   <td className="px-3 py-2.5 text-center text-navy/60">
                     {r.summary.thru}/{holeCount}
                   </td>
-                  <td className="px-3 py-2.5 text-right text-lg font-extrabold text-navy">{r.summary.total}</td>
+                  <td className="px-3 py-2.5 text-right text-lg font-extrabold text-navy">
+                    {r.format === "stroke_play" ? r.summary.netTotal : r.summary.total}
+                  </td>
                 </tr>
               ))}
             </tbody>

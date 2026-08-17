@@ -13,9 +13,14 @@ const PODIUM_STYLES = [
   { medal: "🥉", label: "3rd", className: "bg-navy/10 text-navy order-3 sm:order-3" },
 ];
 
+function totalLabel(row: LeaderboardRow) {
+  return row.format === "stroke_play" ? `${row.summary.netTotal} net` : `${row.summary.total} pts`;
+}
+
 export default function ResultsPage() {
   const { eventId, event } = useEvent();
-  const { rows, holeCount, loading } = useLeaderboardData(eventId);
+  const scoringFormat = event?.scoring_format ?? "stableford";
+  const { rows, holeCount, loading } = useLeaderboardData(eventId, scoringFormat);
 
   if (loading || !event) {
     return (
@@ -58,6 +63,9 @@ export default function ResultsPage() {
       <div className="text-center">
         <p className="text-xs font-bold uppercase tracking-wide text-accent-hover">Event Complete</p>
         <h1 className="mt-1 text-2xl font-bold text-navy">Final Results</h1>
+        <p className="mt-1 text-xs text-navy/50">
+          {scoringFormat === "stroke_play" ? "Stroke Play — lowest net strokes wins" : "Stableford — most points wins"}
+        </p>
       </div>
 
       <div className="mt-6 flex flex-col items-end gap-3 sm:flex-row sm:items-end sm:justify-center">
@@ -72,7 +80,7 @@ export default function ResultsPage() {
                 {r.player.name}
               </p>
             ))}
-            <p className="mt-1 text-lg font-extrabold">{group.rows[0].summary.total} pts</p>
+            <p className="mt-1 text-lg font-extrabold">{totalLabel(group.rows[0])}</p>
           </div>
         ))}
       </div>
@@ -105,7 +113,7 @@ function StandingRow({ row, holeCount }: { row: LeaderboardRow; holeCount: numbe
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-lg font-extrabold text-navy">{row.summary.total} pts</span>
+          <span className="text-lg font-extrabold text-navy">{totalLabel(row)}</span>
           <span className="text-navy/30">{open ? "▲" : "▼"}</span>
         </div>
       </button>
@@ -140,14 +148,25 @@ function StandingRow({ row, holeCount }: { row: LeaderboardRow; holeCount: numbe
                   </td>
                 ))}
               </tr>
-              <tr>
-                <td className="py-1 font-semibold text-accent-hover">Pts</td>
-                {row.summary.holes.map((h) => (
-                  <td key={h.holeNumber} className="py-1 text-center font-semibold text-accent-hover">
-                    {h.points ?? "–"}
-                  </td>
-                ))}
-              </tr>
+              {row.format === "stroke_play" ? (
+                <tr>
+                  <td className="py-1 font-semibold text-accent-hover">Net</td>
+                  {row.summary.holes.map((h) => (
+                    <td key={h.holeNumber} className="py-1 text-center font-semibold text-accent-hover">
+                      {h.net ?? "–"}
+                    </td>
+                  ))}
+                </tr>
+              ) : (
+                <tr>
+                  <td className="py-1 font-semibold text-accent-hover">Pts</td>
+                  {row.summary.holes.map((h) => (
+                    <td key={h.holeNumber} className="py-1 text-center font-semibold text-accent-hover">
+                      {h.points ?? "–"}
+                    </td>
+                  ))}
+                </tr>
+              )}
             </tbody>
           </table>
           <p className="mt-1 text-[10px] text-navy/40">{holeCount} holes</p>

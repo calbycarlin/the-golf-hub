@@ -36,7 +36,12 @@ export function EventHeader() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold">{loading ? "Loading…" : event?.name}</h1>
-            <p className="truncate text-sm text-white/60">{event?.course_name}</p>
+            <p className="truncate text-sm text-white/60">
+              {event?.course_name}
+              {event && (
+                <span className="text-white/40"> · {event.scoring_format === "stroke_play" ? "Stroke Play" : "Stableford"}</span>
+              )}
+            </p>
           </div>
           {event && <StatusBadge status={event.status} />}
         </div>

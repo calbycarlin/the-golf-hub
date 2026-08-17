@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateHostToken, generateJoinCode, hashHostToken } from "@/lib/codes";
+import type { ScoringFormat } from "@/lib/supabase/types";
+
+const SCORING_FORMATS: ScoringFormat[] = ["stableford", "stroke_play"];
 
 interface HoleInput {
   holeNumber: number;
@@ -24,6 +27,7 @@ interface CreateEventBody {
   name: string;
   courseName: string;
   eventDate?: string | null;
+  scoringFormat?: ScoringFormat;
   holes: HoleInput[];
   players: PlayerInput[];
   groups: GroupInput[];
@@ -49,6 +53,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "At least one player is required" }, { status: 400 });
   }
 
+  const scoringFormat: ScoringFormat = SCORING_FORMATS.includes(body.scoringFormat as ScoringFormat)
+    ? (body.scoringFormat as ScoringFormat)
+    : "stableford";
+
   const admin = createAdminClient();
   const hostToken = generateHostToken();
   const hostTokenHash = hashHostToken(hostToken);
@@ -67,6 +75,7 @@ export async function POST(request: Request) {
         join_code: joinCode,
         host_token_hash: hostTokenHash,
         status: "setup",
+        scoring_format: scoringFormat,
       })
       .select("id")
       .single();
