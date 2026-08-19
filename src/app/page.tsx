@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LinkButton } from "@/components/ui/Button";
 import { LogoMark, TrophyIcon } from "@/components/ui/icons";
 
@@ -26,6 +27,10 @@ export default function HomePage() {
           <TrophyIcon className="h-3.5 w-3.5" />
           No accounts. Just a code.
         </p>
+
+        <Link href="/privacy" className="mt-4 inline-block text-xs text-white/40 underline hover:text-white/60">
+          Privacy notice
+        </Link>
       </div>
     </main>
   );

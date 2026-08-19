@@ -207,6 +207,14 @@ export default function CreateEventPage() {
             <p className="mt-1 text-xs text-navy/50">
               Set the number of groups, then add each player straight into their group with a name, handicap, and Player A.
             </p>
+            <p className="mt-1 text-xs text-navy/40">
+              Names, handicaps and scores are visible to anyone with the join code — only add people who are OK with
+              that. See the{" "}
+              <Link href="/privacy" className="underline hover:text-navy/60">
+                privacy notice
+              </Link>
+              .
+            </p>
             <div className="mt-4">
               <GroupBuilder state={groupBuilderState} onChange={setGroupBuilderState} />
             </div>

@@ -11,6 +11,8 @@ import { useEvent } from "@/lib/eventContext";
 import type { PhotoRow } from "@/lib/supabase/types";
 
 const NAME_KEY = "golfhub:uploaderName";
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB — matches the gallery bucket's file_size_limit
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif"]);
 
 export default function GalleryPage() {
   const { eventId } = useEvent();
@@ -54,6 +56,22 @@ export default function GalleryPage() {
     e.target.value = "";
 
     setError(null);
+
+    if (file.size > MAX_FILE_BYTES) {
+      setError("That photo is too large (max 10MB) — try a smaller one.");
+      return;
+    }
+    // Some mobile browsers leave `type` blank for HEIC/HEIF, so fall back
+    // to the file extension rather than reject a genuine phone photo.
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const looksLikeImage = file.type
+      ? ALLOWED_TYPES.has(file.type)
+      : ["jpg", "jpeg", "png", "webp", "heic", "heif", "gif"].includes(ext ?? "");
+    if (!looksLikeImage) {
+      setError("That doesn't look like a photo — please choose an image file.");
+      return;
+    }
+
     setUploading(true);
     window.localStorage.setItem(NAME_KEY, uploaderName);
 
