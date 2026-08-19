@@ -9,14 +9,22 @@ import { useEvent } from "@/lib/eventContext";
 import { apiClient, ApiError } from "@/lib/apiClient";
 import { formatDeletionDate, getRetentionDays } from "@/lib/retention";
 import { FlagIcon, TrophyIcon, CameraIcon, GolfBallIcon } from "@/components/ui/icons";
+import type { ScoringFormat } from "@/lib/supabase/types";
 
-const HUB_LINKS = [
-  { href: "/groupings", label: "Groupings", desc: "See who's playing with who", icon: FlagIcon },
-  { href: "/scorecards", label: "Scorecards", desc: "Enter scores on the course", icon: GolfBallIcon },
-  { href: "/leaderboard", label: "Leaderboard", desc: "Live Stableford standings", icon: TrophyIcon },
-  { href: "/results", label: "Results", desc: "Final podium once complete", icon: TrophyIcon },
-  { href: "/gallery", label: "Gallery", desc: "Photos from the day", icon: CameraIcon },
-];
+function hubLinks(scoringFormat: ScoringFormat) {
+  return [
+    { href: "/groupings", label: "Groupings", desc: "See who's playing with who", icon: FlagIcon },
+    { href: "/scorecards", label: "Scorecards", desc: "Enter scores on the course", icon: GolfBallIcon },
+    {
+      href: "/leaderboard",
+      label: "Leaderboard",
+      desc: scoringFormat === "stroke_play" ? "Live net strokes standings" : "Live Stableford standings",
+      icon: TrophyIcon,
+    },
+    { href: "/results", label: "Results", desc: "Final podium once complete", icon: TrophyIcon },
+    { href: "/gallery", label: "Gallery", desc: "Photos from the day", icon: CameraIcon },
+  ];
+}
 
 export default function EventHubPage() {
   const { event, eventId, isHost, hostToken, notFound, loading, refresh } = useEvent();
@@ -33,7 +41,7 @@ export default function EventHubPage() {
   return (
     <Container>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {HUB_LINKS.map((link) => (
+        {hubLinks(event.scoring_format).map((link) => (
           <LinkButton
             key={link.href}
             href={`/event/${eventId}${link.href}`}
