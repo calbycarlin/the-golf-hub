@@ -54,7 +54,7 @@ Ranking (used by both the leaderboard and results podium) is standard competitio
 
 2. **Create a Supabase project** at [supabase.com](https://supabase.com) (free tier is fine).
 
-3. **Run the migrations.** In the Supabase dashboard's SQL Editor, run each file in `supabase/migrations/` in order (`0001_init.sql`, `0002_storage.sql`, `0003_scoring_format.sql`). (If you use the Supabase CLI instead: `supabase link` then `supabase db push`.)
+3. **Run the migrations.** In the Supabase dashboard's SQL Editor, run each file in `supabase/migrations/` in order (`0001_init.sql`, `0002_storage.sql`, `0003_scoring_format.sql`, `0004_gallery_limits.sql`). (If you use the Supabase CLI instead: `supabase link` then `supabase db push`.)
 
 4. **Copy the env file and fill it in:**
 
@@ -68,6 +68,8 @@ Ranking (used by both the leaderboard and results podium) is standard competitio
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project Settings → API → `anon` `public` key |
    | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role` key — **server-only secret, never expose to the browser** |
    | `HOST_TOKEN_PEPPER` | Any random string you generate (e.g. `openssl rand -hex 32`) — optional locally (a dev default is used), but set a real value in any deployed environment |
+   | `CRON_SECRET` | Any random string you generate — checked against the `Authorization` header on the cleanup cron endpoint so it can't be triggered by anyone else. Optional locally (the check is skipped if unset), but set a real value in any deployed environment |
+   | `EVENT_RETENTION_DAYS` | How many days after creation an event (and its photos) is auto-deleted. Optional, defaults to `30` |
 
 5. **Run the dev server**
 
@@ -88,8 +90,12 @@ Ranking (used by both the leaderboard and results podium) is standard competitio
 
 1. Push this repo to GitHub.
 2. Import it into Vercel ([vercel.com/new](https://vercel.com/new)).
-3. Add the same four environment variables from `.env.example` in the Vercel project's Settings → Environment Variables (Production + Preview).
-4. Deploy. No other config needed — it's a standard Next.js App Router project.
+3. Add the environment variables from `.env.example` in the Vercel project's Settings → Environment Variables (Production + Preview).
+4. Deploy. No other config needed — `vercel.json` already schedules the daily cleanup cron (see below), and it's otherwise a standard Next.js App Router project.
+
+## Automatic cleanup
+
+A Vercel Cron Job (`vercel.json` → `GET /api/cron/cleanup`, daily at 03:00 UTC) deletes any event older than `EVENT_RETENTION_DAYS` (default 30, counted from creation), including its photos in Storage — deleting the `events` row cascades to every other table, but not to the actual files sitting in the `gallery` bucket, so those are removed via the Storage API first. Cron only runs once deployed to Vercel; it does nothing in local dev. Vercel's Hobby (free) plan supports one daily cron job, which is exactly what this needs.
 
 ## Project structure
 
@@ -108,7 +114,9 @@ src/
       leaderboard/              Live Stableford leaderboard
       results/                  Podium + full standings (gated on event.status)
       gallery/                  Photo upload + grid
+    privacy/                    Plain-English privacy notice
     api/events/                 Route Handlers for all host-authorized writes
+    api/cron/cleanup/           Daily retention cleanup (Vercel Cron, see vercel.json)
   lib/
     scoring.ts                  Stableford engine (+ scoring.test.ts)
     ranking.ts                  Shared competition-ranking helper
@@ -133,3 +141,5 @@ A few calls I made where the spec left room, plus one design trade-off flagged i
 - **Deleting a whole group** (not just editing its membership) does cascade-delete any scores already entered for it — editing a group in place (renaming, reassigning players) does not touch scores. This is called out inline in the groupings API route.
 - **RLS is coarse, not code-aware** (see "How access control works" above) — since there's no session, Postgres can't verify "this caller knows the join code." Reads are public at the database layer; the join code is what gates *reaching* the page in the first place. This is a deliberate trade-off consistent with the rest of the no-accounts design, not an oversight.
 - **Stroke Play ranks by net, not gross.** The spec only asked for Stableford; Stroke Play was added later as a second host-selectable format. Since the app already collects a playing handicap for every player specifically for fair comparison, gross-only ranking would have been inconsistent with that — net (gross minus handicap) keeps both formats fair across mixed-handicap groups. The scoring format is fixed at event creation; there's no host control to change it mid-event.
+- **Events auto-delete after 30 days** (configurable via `EVENT_RETENTION_DAYS`), added once real usage made "how do I keep the database tidy" a practical question rather than a hypothetical one. There's no warning before deletion — a golf day's data isn't expected to be needed a month later, and the retention window is generous enough that this shouldn't surprise anyone using the app as intended.
+- **Gallery uploads are capped at 10MB and image MIME types only**, enforced at the Storage bucket level (not just client-side, which is trivially bypassed) — added for the same "actually going to be used" reason as the retention cleanup.
