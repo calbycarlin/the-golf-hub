@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEvent } from "@/lib/eventContext";
 import { StatusBadge } from "@/components/ui/Badge";
 import { CopyButton } from "@/components/CopyButton";
+import { LogoMark } from "@/components/ui/icons";
 
 const TABS = [
   { href: "", label: "Hub" },
@@ -32,7 +33,14 @@ export function EventHeader() {
 
   return (
     <header className="bg-navy text-white">
-      <div className="mx-auto max-w-2xl px-4 py-4 sm:px-6">
+      <div className="mx-auto max-w-2xl px-4 pt-3 sm:px-6">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/50 hover:text-white/80">
+          <LogoMark className="h-4 w-auto" />
+          The Golf Hub
+        </Link>
+      </div>
+
+      <div className="mx-auto max-w-2xl px-4 pb-4 pt-2 sm:px-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold">{loading ? "Loading…" : event?.name}</h1>
