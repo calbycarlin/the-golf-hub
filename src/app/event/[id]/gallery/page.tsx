@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { CameraIcon } from "@/components/ui/icons";
 import { createPublicClient } from "@/lib/supabase/client";
 import { useEvent } from "@/lib/eventContext";
+import { formatDeletionDate } from "@/lib/retention";
 import type { PhotoRow } from "@/lib/supabase/types";
 
 const NAME_KEY = "golfhub:uploaderName";
@@ -15,7 +16,7 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB — matches the gallery bucket
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif"]);
 
 export default function GalleryPage() {
-  const { eventId } = useEvent();
+  const { eventId, event } = useEvent();
   const [photos, setPhotos] = useState<PhotoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploaderName, setUploaderName] = useState(() =>
@@ -108,6 +109,11 @@ export default function GalleryPage() {
     <Container>
       <h1 className="text-xl font-bold text-navy">Gallery</h1>
       <p className="mt-1 text-sm text-navy/60">Share photos from the day — anyone with the join code can add one.</p>
+      {event && (
+        <p className="mt-1 text-xs text-navy/40">
+          Photos are automatically deleted on {formatDeletionDate(event.created_at)} — save any you&rsquo;d like to keep.
+        </p>
+      )}
 
       <Card className="mt-4">
         <Input
