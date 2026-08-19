@@ -128,7 +128,6 @@ export default function GalleryPage() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handleFileSelected}
           className="hidden"
         />
