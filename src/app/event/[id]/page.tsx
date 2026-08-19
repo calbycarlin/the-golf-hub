@@ -7,7 +7,7 @@ import { LinkButton, Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { useEvent } from "@/lib/eventContext";
 import { apiClient, ApiError } from "@/lib/apiClient";
-import { formatDeletionDate } from "@/lib/retention";
+import { formatDeletionDate, getRetentionDays } from "@/lib/retention";
 import { FlagIcon, TrophyIcon, CameraIcon, GolfBallIcon } from "@/components/ui/icons";
 
 const HUB_LINKS = [
@@ -50,7 +50,8 @@ export default function EventHubPage() {
       </div>
 
       <p className="mt-4 text-center text-xs text-navy/40">
-        This event, including scores and photos, is automatically deleted on {formatDeletionDate(event.created_at)}.
+        This event, including scores and photos, is automatically deleted {getRetentionDays()} days after the{" "}
+        {event.event_date ? "event date" : "event was created"} — on {formatDeletionDate(event)}.
       </p>
 
       {isHost && hostToken && (

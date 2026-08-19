@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { CameraIcon } from "@/components/ui/icons";
 import { createPublicClient } from "@/lib/supabase/client";
 import { useEvent } from "@/lib/eventContext";
-import { formatDeletionDate } from "@/lib/retention";
+import { formatDeletionDate, getRetentionDays } from "@/lib/retention";
 import type { PhotoRow } from "@/lib/supabase/types";
 
 const NAME_KEY = "golfhub:uploaderName";
@@ -111,7 +111,9 @@ export default function GalleryPage() {
       <p className="mt-1 text-sm text-navy/60">Share photos from the day — anyone with the join code can add one.</p>
       {event && (
         <p className="mt-1 text-xs text-navy/40">
-          Photos are automatically deleted on {formatDeletionDate(event.created_at)} — save any you&rsquo;d like to keep.
+          Photos are automatically deleted {getRetentionDays()} days after the{" "}
+          {event.event_date ? "event date" : "event was created"} — on {formatDeletionDate(event)}. Save any
+          you&rsquo;d like to keep.
         </p>
       )}
 

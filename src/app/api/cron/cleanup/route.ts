@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getRetentionAnchorDate } from "@/lib/retention";
 
 /**
  * Daily housekeeping (triggered by Vercel Cron, see vercel.json): deletes
- * any event older than EVENT_RETENTION_DAYS (default 30) along with its
- * photos in Storage. Deleting the `events` row cascades to holes, players,
- * groups, group_players, hole_scores and the `photos` table rows — but not
- * the actual files sitting in the `gallery` bucket, which is why photos
- * are removed from Storage explicitly first.
+ * any event whose retention window has passed — EVENT_RETENTION_DAYS
+ * (default 30) after its event date, or after creation if no event date
+ * was set — along with its photos in Storage. Deleting the `events` row
+ * cascades to holes, players, groups, group_players, hole_scores and the
+ * `photos` table rows — but not the actual files sitting in the `gallery`
+ * bucket, which is why photos are removed from Storage explicitly first.
+ *
+ * The anchor date (event_date ?? created_at) isn't something Postgres can
+ * filter on directly through a single column comparison, and this app's
+ * scale doesn't warrant a SQL function for it — so all events are fetched
+ * and filtered here instead.
  */
 export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -19,23 +26,28 @@ export async function GET(request: Request) {
   }
 
   const retentionDays = Number(process.env.EVENT_RETENTION_DAYS) || 30;
-  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  const now = Date.now();
+  const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
 
   const admin = createAdminClient();
 
-  const { data: expiredEvents, error: eventsError } = await admin
+  const { data: allEvents, error: eventsError } = await admin
     .from("events")
-    .select("id, name, created_at")
-    .lt("created_at", cutoff);
+    .select("id, event_date, created_at");
 
   if (eventsError) {
     return NextResponse.json({ error: eventsError.message }, { status: 500 });
   }
 
+  const expiredEvents = (allEvents ?? []).filter((event) => {
+    const anchor = getRetentionAnchorDate(event).getTime();
+    return anchor + retentionMs < now;
+  });
+
   let photosDeleted = 0;
   const deletedEventIds: string[] = [];
 
-  for (const event of expiredEvents ?? []) {
+  for (const event of expiredEvents) {
     const { data: photos } = await admin.from("photos").select("storage_path").eq("event_id", event.id);
 
     if (photos?.length) {
@@ -53,7 +65,6 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     retentionDays,
-    cutoff,
     eventsDeleted: deletedEventIds.length,
     photosDeleted,
   });
